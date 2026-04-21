@@ -62,7 +62,7 @@ pnpm --filter @repo/web exec prisma generate
 Seed a demo user (email: `nrecordsmeat@gmail.com`, password: `password`):
 
 ```bash
-pnpm --filter @repo/web exec tsx prisma/seed.ts
+pnpm db:seed
 ```
 
 ### 5. Build shared package

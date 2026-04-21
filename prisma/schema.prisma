@@ -1,0 +1,260 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum BrandStatus {
+  DRAFT
+  LOCKED
+}
+
+enum ReleaseStatus {
+  DRAFT
+  CONTENT_PENDING
+  CONTENT_REVIEW
+  MODERATION_QUEUE
+  APPROVED
+  REJECTED
+  DISTRIBUTING
+  LIVE
+}
+
+enum AssetKind {
+  AUDIO_MASTER
+  COVER
+  LYRICS
+  SOCIAL_POST
+  TEASER_VIDEO
+  OTHER
+}
+
+enum AssetSource {
+  USER_UPLOAD
+  AI_GENERATED
+}
+
+enum AiModule {
+  BRAND
+  COVER
+  SOCIAL
+  TEASER
+}
+
+enum GenerationStatus {
+  PENDING
+  READY
+  APPROVED
+  REJECTED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum ModerationAction {
+  APPROVED
+  REJECTED
+  SENT_BACK
+}
+
+// ── Models ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  artists       Artist[]
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Artist {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  name           String
+  slug           String        @unique
+  currentBrandId String?       @unique
+  currentBrand   BrandProfile? @relation("CurrentBrand", fields: [currentBrandId], references: [id])
+  brands         BrandProfile[] @relation("AllBrands")
+  releases       Release[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  @@index([userId])
+  @@index([deletedAt])
+}
+
+model BrandProfile {
+  id        String      @id @default(cuid())
+  artistId  String
+  artist    Artist      @relation("AllBrands", fields: [artistId], references: [id])
+  version   Int
+  status    BrandStatus @default(DRAFT)
+  data      Json
+  currentOf Artist?     @relation("CurrentBrand")
+  releases  Release[]
+  createdAt DateTime    @default(now())
+  lockedAt  DateTime?
+  deletedAt DateTime?
+
+  @@unique([artistId, version])
+  @@index([artistId])
+  @@index([deletedAt])
+}
+
+model Release {
+  id             String        @id @default(cuid())
+  artistId       String
+  artist         Artist        @relation(fields: [artistId], references: [id])
+  brandProfileId String
+  brandProfile   BrandProfile  @relation(fields: [brandProfileId], references: [id])
+  title          String
+  status         ReleaseStatus @default(DRAFT)
+  scheduledFor   DateTime?
+  publishedAt    DateTime?
+  metadata       Json          @default("{}")
+  pipelineConfig Json          @default("{}")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  assets            Asset[]
+  generatedContents GeneratedContent[]
+  moderationRecords ModerationRecord[]
+  aiJobs            AiJob[]
+  statusEvents      ReleaseStatusEvent[]
+
+  @@index([artistId, status])
+  @@index([status, scheduledFor])
+  @@index([deletedAt])
+}
+
+model Asset {
+  id                 String            @id @default(cuid())
+  releaseId          String
+  release            Release           @relation(fields: [releaseId], references: [id])
+  kind               AssetKind
+  source             AssetSource
+  generatedContentId String?
+  generatedContent   GeneratedContent? @relation(fields: [generatedContentId], references: [id])
+  url                String
+  fileName           String
+  mimeType           String
+  sizeBytes          Int
+  meta               Json              @default("{}")
+  createdAt          DateTime          @default(now())
+
+  @@index([releaseId, kind])
+}
+
+model GeneratedContent {
+  id         String           @id @default(cuid())
+  releaseId  String
+  release    Release          @relation(fields: [releaseId], references: [id])
+  module     AiModule
+  status     GenerationStatus
+  payload    Json
+  assets     Asset[]
+  createdAt  DateTime         @default(now())
+  approvedAt DateTime?
+
+  @@index([releaseId, module])
+}
+
+model AiJob {
+  id         String    @id @default(cuid())
+  releaseId  String?
+  release    Release?  @relation(fields: [releaseId], references: [id])
+  module     AiModule
+  jobId      String    @unique
+  status     JobStatus @default(QUEUED)
+  input      Json
+  output     Json?
+  error      String?
+  costMeta   Json      @default("{}")
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([releaseId, module])
+  @@index([status])
+}
+
+model ModerationRecord {
+  id             String           @id @default(cuid())
+  releaseId      String
+  release        Release          @relation(fields: [releaseId], references: [id])
+  action         ModerationAction
+  reason         String?
+  moderatorEmail String
+  createdAt      DateTime         @default(now())
+
+  @@index([releaseId])
+}
+
+model ReleaseStatusEvent {
+  id         String        @id @default(cuid())
+  releaseId  String
+  release    Release       @relation(fields: [releaseId], references: [id])
+  fromStatus ReleaseStatus
+  toStatus   ReleaseStatus
+  event      String
+  actorRole  String
+  actorRef   String?
+  reason     String?
+  createdAt  DateTime      @default(now())
+
+  @@index([releaseId])
+}

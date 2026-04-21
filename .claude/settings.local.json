@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npm list *)",
+      "Bash(npm install *)",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(pnpm --version)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm approve-builds *)",
+      "Bash(kill %1)",
+      "Bash(pnpm db:generate)",
+      "Bash(docker compose *)",
+      "Bash(open -a Docker)",
+      "Bash(docker info *)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@127.0.0.1:5432/meatrecords\" npx prisma migrate dev --name init --schema=/Users/makopyants/workspace/personal/meatrecords/prisma/schema.prisma)",
+      "Bash(pkill -f \"prisma migrate\")",
+      "Bash(pnpm dev *)",
+      "Bash(echo \"web pid: $!\")",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@127.0.0.1:5432/meatrecords\" npx prisma studio --schema=/Users/makopyants/workspace/personal/meatrecords/prisma/schema.prisma)",
+      "Bash(echo \"studio pid: $!\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/login)",
+      "Bash(curl -s http://localhost:3000/login)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('err',{}\\).get\\('message',''\\)[:400]\\)\")"
+    ]
+  }
+}

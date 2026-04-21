@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+build/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# prisma
+prisma/migrations/
+
+# misc
+.DS_Store
+*.log
+.turbo/
+
+# IDE
+.idea/
+.vscode/settings.json

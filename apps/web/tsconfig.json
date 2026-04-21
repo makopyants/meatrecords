@@ -23,6 +23,8 @@
     },
     "allowJs": true,
     "noEmit": true,
+    "declaration": false,
+    "rootDir": ".",
     "resolveJsonModule": true,
     "isolatedModules": true
   },

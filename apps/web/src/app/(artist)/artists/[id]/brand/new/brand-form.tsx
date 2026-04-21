@@ -2,138 +2,189 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
-interface Props { artistId: string }
-
-const MOODS = ["dark", "light", "vibrant", "muted", "monochrome"] as const;
-const LAYOUTS = ["centered_logo", "full_bleed", "minimal_text", "typographic"] as const;
-const PLATFORMS = ["telegram", "vk", "instagram", "youtube", "tiktok", "spotify"] as const;
-const LANGUAGES = ["ru", "en", "ru_en_mixed"] as const;
-
-function TagInput({
-  label, value, onChange, placeholder, hint,
-}: {
-  label: string; value: string[]; onChange: (v: string[]) => void;
-  placeholder?: string; hint?: string;
-}) {
-  const [input, setInput] = useState("");
-  function add() {
-    const v = input.trim();
-    if (v && !value.includes(v)) onChange([...value, v]);
-    setInput("");
-  }
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
-      <div className="flex gap-2">
-        <Input value={input} onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), add())}
-          placeholder={placeholder ?? "Введи и нажми Enter"} />
-        <Button type="button" variant="outline" size="sm" onClick={add}>+</Button>
-      </div>
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1">
-          {value.map((t) => (
-            <span key={t} className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs">
-              {t}
-              <button type="button" onClick={() => onChange(value.filter((x) => x !== t))}
-                className="text-muted-foreground hover:text-foreground">×</button>
-            </span>
-          ))}
-        </div>
-      )}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
+interface Props {
+  artistId: string;
+  defaultName?: string;
 }
 
-export function BrandForm({ artistId }: Props) {
+const MOODS = [
+  {
+    id: "dark",
+    label: "Тёмный",
+    hint: "меланхолия, ночь, глубина",
+    palette: { primary: "#0A0A0A", secondary: "#E8E8E8", accent: "#C8102E" },
+    coverLayout: "minimal_text" as const,
+    descriptors: ["cinematic", "dark atmosphere", "high contrast", "moody", "noir"],
+    imageStyle: "Dark cinematic photography, deep shadows, high contrast black and white, mysterious and atmospheric, editorial style",
+  },
+  {
+    id: "vibrant",
+    label: "Яркий",
+    hint: "энергия, цвет, движение",
+    palette: { primary: "#FF2D55", secondary: "#1C1C1E", accent: "#FFD60A" },
+    coverLayout: "full_bleed" as const,
+    descriptors: ["vivid colors", "dynamic", "energetic", "bold", "saturated"],
+    imageStyle: "Vibrant saturated photography, bold colors, dynamic composition, energetic and expressive, pop art influences",
+  },
+  {
+    id: "muted",
+    label: "Атмосферный",
+    hint: "туман, пространство, воздух",
+    palette: { primary: "#3A3A3C", secondary: "#F2F2F7", accent: "#30D158" },
+    coverLayout: "centered_logo" as const,
+    descriptors: ["soft", "atmospheric", "muted tones", "ethereal", "ambient"],
+    imageStyle: "Soft muted photography, foggy landscapes, pastel tones, dreamy and ethereal, wide open spaces",
+  },
+  {
+    id: "monochrome",
+    label: "Минимализм",
+    hint: "чисто, строго, типографика",
+    palette: { primary: "#000000", secondary: "#FFFFFF", accent: "#6C6C70" },
+    coverLayout: "typographic" as const,
+    descriptors: ["minimal", "clean", "geometric", "monochrome", "typographic"],
+    imageStyle: "Minimalist monochrome photography, clean lines, geometric shapes, stark contrasts, architectural precision",
+  },
+  {
+    id: "light",
+    label: "Светлый",
+    hint: "день, тепло, простота",
+    palette: { primary: "#F5F5F0", secondary: "#1C1C1E", accent: "#007AFF" },
+    coverLayout: "centered_logo" as const,
+    descriptors: ["bright", "airy", "warm light", "natural", "fresh"],
+    imageStyle: "Bright airy photography, natural light, warm tones, fresh and clean aesthetic, lifestyle imagery",
+  },
+] as const;
+
+type MoodId = typeof MOODS[number]["id"];
+
+const PLATFORMS = [
+  { id: "vk", label: "VK" },
+  { id: "telegram", label: "Telegram" },
+  { id: "instagram", label: "Instagram" },
+  { id: "youtube", label: "YouTube" },
+  { id: "tiktok", label: "TikTok" },
+  { id: "spotify", label: "Spotify" },
+] as const;
+
+export function BrandForm({ artistId, defaultName = "" }: Props) {
   const router = useRouter();
+  const [step, setStep] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
-  // Identity
-  const [artistName, setArtistName] = useState("");
+  const [artistName, setArtistName] = useState(defaultName);
   const [oneLiner, setOneLiner] = useState("");
   const [description, setDescription] = useState("");
-  const [keywords, setKeywords] = useState<string[]>([]);
+  const [genreInput, setGenreInput] = useState("");
+  const [selectedMood, setSelectedMood] = useState<MoodId | null>(null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["vk"]);
+  const [language, setLanguage] = useState<"ru" | "en" | "ru_en_mixed">("ru");
 
-  // Visual
-  const [primary, setPrimary] = useState("#1A1A1A");
-  const [secondary, setSecondary] = useState("#F5F5F5");
-  const [accent, setAccent] = useState("#FF4500");
-  const [mood, setMood] = useState<typeof MOODS[number]>("dark");
-  const [promptFragment, setPromptFragment] = useState("");
-  const [descriptors, setDescriptors] = useState<string[]>([]);
-  const [forbidden, setForbidden] = useState<string[]>([]);
-  const [coverLayout, setCoverLayout] = useState<typeof LAYOUTS[number]>("centered_logo");
+  const steps = [
+    {
+      title: "Как тебя зовут?",
+      hint: "Имя артиста и короткий слоган",
+      valid: artistName.trim().length > 0 && oneLiner.trim().length > 0,
+    },
+    {
+      title: "О чём твоя музыка?",
+      hint: "Расскажи своими словами — это основа для AI",
+      valid: description.trim().length >= 20,
+    },
+    {
+      title: "Жанры и стиль",
+      hint: "Через запятую: techno, dark ambient, experimental",
+      valid: genreInput.trim().length > 0,
+    },
+    {
+      title: "Выбери настроение",
+      hint: "Определяет визуальный стиль всего контента",
+      valid: selectedMood !== null,
+    },
+    {
+      title: "Где ты есть?",
+      hint: "Платформы и основной язык",
+      valid: selectedPlatforms.length > 0,
+    },
+  ];
 
-  // Verbal
-  const [toneDescriptors, setToneDescriptors] = useState<string[]>([]);
-  const [bioShort, setBioShort] = useState("");
-  const [bioLong, setBioLong] = useState("");
-  const [pressOneLiner, setPressOneLiner] = useState("");
-  const [themes, setThemes] = useState<string[]>([]);
-  const [language, setLanguage] = useState<typeof LANGUAGES[number]>("ru");
+  function buildBrandData() {
+    const mood = MOODS.find((m) => m.id === selectedMood)!;
+    const genres = genreInput.split(",").map((s) => s.trim()).filter(Boolean);
+    const keywords = [...genres, ...mood.descriptors.slice(0, 3)].slice(0, 10);
+    const themes = genres.slice(0, 5).length >= 2 ? genres.slice(0, 5) : [...genres, "музыка"].slice(0, 5);
 
-  // Audience
-  const [audienceDesc, setAudienceDesc] = useState("");
-  const [interests, setInterests] = useState<string[]>([]);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<{ name: string; priority: "primary" | "secondary" }[]>([]);
-  const [genre, setGenre] = useState<string[]>([]);
-  const [differentBecause, setDifferentBecause] = useState("");
-
-  function togglePlatform(name: string) {
-    const existing = selectedPlatforms.find((p) => p.name === name);
-    if (existing) {
-      setSelectedPlatforms(selectedPlatforms.filter((p) => p.name !== name));
-    } else {
-      setSelectedPlatforms([...selectedPlatforms, { name, priority: "primary" }]);
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setPending(true);
-    setError("");
-
-    const brandData = {
+    return {
       v: 1,
       identity: {
         artistName,
-        concept: { oneLiner, description, keywords },
+        concept: {
+          oneLiner,
+          description,
+          keywords,
+        },
         logomark: null,
       },
       visual: {
-        palette: { primary, secondary, accent, mood },
+        palette: { ...mood.palette, mood: mood.id as "dark" | "light" | "vibrant" | "muted" | "monochrome" },
         typography: null,
-        imageStyle: { promptFragment, descriptors, forbidden, references: [] },
-        composition: { coverLayout, socialAspectRatios: ["1:1", "9:16"] },
+        imageStyle: {
+          promptFragment: `${mood.imageStyle}. Artist style: ${description.slice(0, 200)}`,
+          descriptors: mood.descriptors as unknown as string[],
+          forbidden: [],
+          references: [],
+        },
+        composition: {
+          coverLayout: mood.coverLayout,
+          socialAspectRatios: ["1:1", "9:16"] as ("1:1" | "9:16")[],
+        },
       },
       verbal: {
-        toneOfVoice: { descriptors: toneDescriptors, avoid: [] },
-        exemplars: { bioShort, bioLong, pressOneLiner },
-        themes,
-        language: { primary: language, secondary: [] },
+        toneOfVoice: {
+          descriptors: mood.descriptors.slice(0, 5) as unknown as string[],
+          avoid: [],
+        },
+        exemplars: {
+          bioShort: `${artistName} — ${oneLiner}`,
+          bioLong: description,
+          pressOneLiner: `${artistName}: ${oneLiner}`,
+        },
+        themes: themes.length >= 2 ? themes : [...themes, "творчество"],
+        language: { primary: language, secondary: [] as ("ru" | "en")[] },
       },
       audience: {
-        primary: { description: audienceDesc, interests },
-        platforms: selectedPlatforms.length > 0 ? selectedPlatforms : [{ name: "vk", priority: "primary" }],
-        positioning: { genre, similarTo: [], differentBecause },
+        primary: {
+          description: `Слушатели ${genres.join(", ")} музыки`,
+          interests: genres.slice(0, 5).length >= 2 ? genres.slice(0, 5) : [...genres, "музыка"],
+        },
+        platforms: selectedPlatforms.map((p, i) => ({
+          name: p as "telegram" | "vk" | "instagram" | "youtube" | "tiktok" | "spotify",
+          priority: (i === 0 ? "primary" : "secondary") as "primary" | "secondary",
+        })),
+        positioning: {
+          genre: genres.slice(0, 5).length > 0 ? genres.slice(0, 5) : ["music"],
+          similarTo: [],
+          differentBecause: description.slice(0, 499),
+        },
       },
-      source: { generatedBy: "user_manual", aiJobIds: [] },
+      source: { generatedBy: "user_manual" as const, aiJobIds: [] },
     };
+  }
+
+  async function handleSubmit() {
+    setPending(true);
+    setError("");
 
     const res = await fetch(`/api/v1/artists/${artistId}/brand`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: brandData, lockAndSetCurrent: true }),
+      body: JSON.stringify({ data: buildBrandData(), lockAndSetCurrent: true }),
     });
 
     if (res.ok) {
@@ -141,155 +192,210 @@ export function BrandForm({ artistId }: Props) {
       router.refresh();
     } else {
       const data = await res.json() as { error: unknown };
-      setError(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
+      setError(typeof data.error === "string" ? data.error : "Ошибка сохранения");
+      setPending(false);
     }
-    setPending(false);
   }
 
+  const current = steps[step]!;
+  const isLast = step === steps.length - 1;
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
+      {/* Progress */}
+      <div className="flex gap-1.5">
+        {steps.map((_, i) => (
+          <div
+            key={i}
+            className={cn(
+              "h-1 flex-1 rounded-full transition-colors",
+              i < step ? "bg-primary" : i === step ? "bg-primary/60" : "bg-muted",
+            )}
+          />
+        ))}
+      </div>
 
-      {/* Identity */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Идентичность</CardTitle></CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>Имя артиста *</Label>
-            <Input value={artistName} onChange={(e) => setArtistName(e.target.value)} required placeholder="Как пишется на обложках" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>One-liner (до 140 символов) *</Label>
-            <Input value={oneLiner} onChange={(e) => setOneLiner(e.target.value)} required maxLength={140} placeholder="Электронная музыка для ночных городов" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Описание концепции (до 1000 символов) *</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={1000} rows={3} placeholder="Что стоит за образом артиста, откуда он, о чём его музыка" />
-          </div>
-          <TagInput label="Ключевые слова (3–10) *" value={keywords} onChange={setKeywords} placeholder="Например: меланхолия" hint="Минимум 3 слова" />
-        </CardContent>
-      </Card>
+      {/* Step header */}
+      <div className="flex flex-col gap-1">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider">
+          Шаг {step + 1} из {steps.length}
+        </p>
+        <h2 className="text-xl font-bold">{current.title}</h2>
+        <p className="text-sm text-muted-foreground">{current.hint}</p>
+      </div>
 
-      {/* Visual */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Визуальный стиль</CardTitle></CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-3">
-            {([["primary", primary, setPrimary, "Основной"], ["secondary", secondary, setSecondary, "Второстепенный"], ["accent", accent, setAccent, "Акцент"]] as const).map(([, val, setter, lbl]) => (
-              <div key={lbl} className="flex flex-col gap-1.5">
-                <Label>{lbl}</Label>
-                <div className="flex items-center gap-2">
-                  <input type="color" value={val} onChange={(e) => (setter as (v: string) => void)(e.target.value)} className="h-9 w-12 rounded border cursor-pointer" />
-                  <Input value={val} onChange={(e) => (setter as (v: string) => void)(e.target.value)} className="font-mono text-xs" maxLength={7} />
+      {/* Step content */}
+      <div className="flex flex-col gap-4">
+        {step === 0 && (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <Label>Имя артиста</Label>
+              <Input
+                value={artistName}
+                onChange={(e) => setArtistName(e.target.value)}
+                placeholder="IVANOV"
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>В одном предложении — кто ты?</Label>
+              <Input
+                value={oneLiner}
+                onChange={(e) => setOneLiner(e.target.value)}
+                placeholder="Электронная музыка между тревогой и катарсисом"
+                maxLength={140}
+              />
+              <p className="text-xs text-muted-foreground text-right">{oneLiner.length}/140</p>
+            </div>
+          </>
+        )}
+
+        {step === 1 && (
+          <div className="flex flex-col gap-1.5">
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Расскажи о своей музыке, образе, идее. Откуда берётся звук, какие темы ты исследуешь, что хочешь донести слушателю..."
+              rows={7}
+              autoFocus
+              maxLength={1000}
+            />
+            <p className="text-xs text-muted-foreground text-right">{description.length}/1000</p>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="flex flex-col gap-1.5">
+            <Label>Жанры</Label>
+            <Input
+              value={genreInput}
+              onChange={(e) => setGenreInput(e.target.value)}
+              placeholder="techno, dark ambient, industrial"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">Через запятую, любые слова — они станут ключевыми для AI</p>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {MOODS.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setSelectedMood(m.id)}
+                className={cn(
+                  "flex flex-col gap-3 rounded-xl border p-4 text-left transition-all hover:border-primary",
+                  selectedMood === m.id
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border",
+                )}
+              >
+                {/* Palette preview */}
+                <div className="flex gap-1.5">
+                  {Object.values(m.palette).filter(v => v.startsWith("#")).map((color) => (
+                    <div
+                      key={color}
+                      className="h-5 w-5 rounded-full border border-white/20"
+                      style={{ background: color }}
+                    />
+                  ))}
                 </div>
-              </div>
+                <div>
+                  <p className="font-medium text-sm">{m.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{m.hint}</p>
+                </div>
+              </button>
             ))}
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Настроение палитры</Label>
-            <div className="flex gap-2 flex-wrap">
-              {MOODS.map((m) => (
-                <button key={m} type="button" onClick={() => setMood(m)}
-                  className={`rounded-full px-3 py-1 text-sm border transition-colors ${mood === m ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Описание визуального стиля для AI (50–500 символов) *</Label>
-            <Textarea value={promptFragment} onChange={(e) => setPromptFragment(e.target.value)} required minLength={50} maxLength={500} rows={3} placeholder="Cinematic dark photography, neon lights reflecting on wet asphalt, high contrast black and white..." />
-          </div>
-          <TagInput label="Визуальные дескрипторы (3–15) *" value={descriptors} onChange={setDescriptors} placeholder="Например: cinematic" hint="Минимум 3" />
-          <TagInput label="Запрещённые элементы" value={forbidden} onChange={setForbidden} placeholder="Например: cartoons" />
-          <div className="flex flex-col gap-1.5">
-            <Label>Макет обложки</Label>
-            <div className="flex gap-2 flex-wrap">
-              {LAYOUTS.map((l) => (
-                <button key={l} type="button" onClick={() => setCoverLayout(l)}
-                  className={`rounded-full px-3 py-1 text-sm border transition-colors ${coverLayout === l ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
-                  {l.replace(/_/g, " ")}
-                </button>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        )}
 
-      {/* Verbal */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Вербальный стиль</CardTitle></CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <TagInput label="Тон голоса (3–8 дескрипторов) *" value={toneDescriptors} onChange={setToneDescriptors} placeholder="Например: меланхоличный" hint="Минимум 3" />
-          <div className="flex flex-col gap-1.5">
-            <Label>Короткое био (до 280 символов) *</Label>
-            <Textarea value={bioShort} onChange={(e) => setBioShort(e.target.value)} required maxLength={280} rows={2} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Длинное био (до 2000 символов) *</Label>
-            <Textarea value={bioLong} onChange={(e) => setBioLong(e.target.value)} required maxLength={2000} rows={5} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Пресс-строка (до 140 символов) *</Label>
-            <Input value={pressOneLiner} onChange={(e) => setPressOneLiner(e.target.value)} required maxLength={140} placeholder="Для пресс-релизов и каталогов" />
-          </div>
-          <TagInput label="Темы творчества (2–7) *" value={themes} onChange={setThemes} placeholder="Например: одиночество" hint="Минимум 2" />
-          <div className="flex flex-col gap-1.5">
-            <Label>Основной язык</Label>
-            <div className="flex gap-2">
-              {LANGUAGES.map((l) => (
-                <button key={l} type="button" onClick={() => setLanguage(l)}
-                  className={`rounded-full px-3 py-1 text-sm border transition-colors ${language === l ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
-                  {l}
-                </button>
-              ))}
+        {step === 4 && (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <Label>Платформы</Label>
+              <div className="flex flex-wrap gap-2">
+                {PLATFORMS.map((p) => {
+                  const on = selectedPlatforms.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() =>
+                        setSelectedPlatforms(
+                          on
+                            ? selectedPlatforms.filter((x) => x !== p.id)
+                            : [...selectedPlatforms, p.id],
+                        )
+                      }
+                      className={cn(
+                        "rounded-full border px-4 py-1.5 text-sm transition-colors",
+                        on
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Audience */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Аудитория</CardTitle></CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>Описание основной аудитории *</Label>
-            <Textarea value={audienceDesc} onChange={(e) => setAudienceDesc(e.target.value)} required maxLength={500} rows={2} placeholder="Молодые люди 18–28, интересующиеся электронной музыкой..." />
-          </div>
-          <TagInput label="Интересы аудитории (2–10) *" value={interests} onChange={setInterests} placeholder="Например: nightlife" hint="Минимум 2" />
-          <div className="flex flex-col gap-1.5">
-            <Label>Платформы (выбери хотя бы одну) *</Label>
-            <div className="flex gap-2 flex-wrap">
-              {PLATFORMS.map((p) => {
-                const selected = selectedPlatforms.find((x) => x.name === p);
-                return (
-                  <button key={p} type="button" onClick={() => togglePlatform(p)}
-                    className={`rounded-full px-3 py-1 text-sm border transition-colors ${selected ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
-                    {p}
+            <div className="flex flex-col gap-2">
+              <Label>Основной язык</Label>
+              <div className="flex gap-2">
+                {(["ru", "en", "ru_en_mixed"] as const).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setLanguage(l)}
+                    className={cn(
+                      "rounded-full border px-4 py-1.5 text-sm transition-colors",
+                      language === l
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {l === "ru" ? "Русский" : l === "en" ? "English" : "Оба"}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
           </div>
-          <TagInput label="Жанры (1–5) *" value={genre} onChange={setGenre} placeholder="Например: techno" hint="Минимум 1" />
-          <div className="flex flex-col gap-1.5">
-            <Label>Чем отличается от других (до 500 символов) *</Label>
-            <Textarea value={differentBecause} onChange={(e) => setDifferentBecause(e.target.value)} required maxLength={500} rows={2} />
-          </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
       {error && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
-        </div>
+        </p>
       )}
 
-      <div className="flex gap-2 justify-end pb-8">
-        <Button type="button" variant="outline" onClick={() => router.back()}>Отмена</Button>
-        <Button type="submit" disabled={pending}>
-          {pending ? "Сохраняем..." : "Сохранить и заблокировать"}
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => (step === 0 ? router.back() : setStep(step - 1))}
+          disabled={pending}
+        >
+          {step === 0 ? "Отмена" : "← Назад"}
         </Button>
+
+        {isLast ? (
+          <Button onClick={() => void handleSubmit()} disabled={!current.valid || pending}>
+            {pending ? "Сохраняем..." : "Готово →"}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            onClick={() => setStep(step + 1)}
+            disabled={!current.valid}
+          >
+            Далее →
+          </Button>
+        )}
       </div>
-    </form>
+    </div>
   );
 }

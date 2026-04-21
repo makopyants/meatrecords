@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { ReleaseActions } from "./release-actions";
 import { ModuleSection } from "./module-section";
 import { AudioUpload } from "./audio-upload";
+import { PendingPoller } from "./pending-poller";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Черновик",
@@ -39,7 +40,7 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
       artist: { select: { name: true } },
       assets: true,
       generatedContents: { orderBy: { createdAt: "desc" } },
-      aiJobs: { orderBy: { createdAt: "desc" } },
+      aiJobs: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -48,16 +49,17 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
   const pipeline = release.pipelineConfig as {
     modules?: { cover?: boolean; social?: boolean; teaser?: boolean };
   };
-  const enabledModules = [
-    pipeline.modules?.cover !== false && "COVER",
-    pipeline.modules?.social !== false && "SOCIAL",
-    pipeline.modules?.teaser !== false && "TEASER",
-  ].filter(Boolean) as string[];
+  const enabledModules = (["COVER", "SOCIAL", "TEASER"] as const).filter(
+    (mod) => pipeline.modules?.[mod.toLowerCase() as "cover" | "social" | "teaser"] !== false,
+  );
 
   const hasAudio = release.assets.some((a) => a.kind === "AUDIO_MASTER");
+  const isPending = release.status === "CONTENT_PENDING";
 
   return (
     <div className="flex flex-col gap-8 max-w-2xl">
+      {isPending && <PendingPoller />}
+
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <p className="text-sm text-muted-foreground">{release.artist.name}</p>
@@ -68,19 +70,22 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
         </Badge>
       </div>
 
-      <ReleaseActions
-        releaseId={release.id}
-        status={release.status}
-        hasAudio={hasAudio}
-      />
+      <ReleaseActions releaseId={release.id} status={release.status} hasAudio={hasAudio} />
 
       {release.status !== "DRAFT" && (
         <>
           <Separator />
           <div className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              AI-контент
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                AI-контент
+              </h2>
+              {isPending && (
+                <p className="text-xs text-muted-foreground animate-pulse">
+                  Обновляется автоматически...
+                </p>
+              )}
+            </div>
             {enabledModules.map((mod) => {
               const content = release.generatedContents.find((c) => c.module === mod);
               const job = release.aiJobs.find((j) => j.module === mod);
@@ -89,7 +94,7 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
                   key={mod}
                   releaseId={release.id}
                   module={mod}
-                  content={content ?? null}
+                  content={content ? { id: content.id, status: content.status, payload: content.payload } : null}
                   jobStatus={job?.status ?? null}
                 />
               );
@@ -102,7 +107,9 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
         <>
           <Separator />
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Аудиофайл</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Аудиофайл
+            </h2>
             <AudioUpload releaseId={release.id} hasAudio={hasAudio} />
           </div>
         </>

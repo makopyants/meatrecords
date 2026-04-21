@@ -1,26 +1,34 @@
-# dependencies
+# Dependencies
 node_modules/
 .pnpm-store/
 
-# builds
+# Build outputs
 dist/
 .next/
 out/
-build/
 
-# env
+# Environment — copy .env.example and fill in values
 .env
 .env.local
 .env.*.local
 
-# prisma
-prisma/migrations/
-
-# misc
+# OS
 .DS_Store
-*.log
-.turbo/
+Thumbs.db
 
-# IDE
+# Editors
+.vscode/
 .idea/
-.vscode/settings.json
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+
+# Misc
+.turbo/

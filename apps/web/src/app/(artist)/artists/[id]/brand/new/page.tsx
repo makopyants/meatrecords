@@ -13,15 +13,14 @@ export default async function NewBrandPage({ params }: { params: Promise<{ id: s
   if (!artist) notFound();
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex flex-col gap-6 max-w-lg">
       <div>
-        <p className="text-sm text-muted-foreground">{artist.name}</p>
-        <h1 className="text-2xl font-bold">Создать BrandProfile</h1>
+        <h1 className="text-2xl font-bold">Настрой свой бренд</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          BrandProfile — это основа всего AI-контента. Заполни один раз, используется во всех релизах.
+          5 вопросов — и AI будет знать как выглядит твоя музыка.
         </p>
       </div>
-      <BrandForm artistId={artist.id} />
+      <BrandForm artistId={artist.id} defaultName={artist.name} />
     </div>
   );
 }

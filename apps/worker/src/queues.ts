@@ -1,5 +1,5 @@
 import { Queue, QueueEvents } from "bullmq";
-import IORedis from "ioredis";
+import { Redis as IORedis } from "ioredis";
 import type { AiModule } from "@repo/shared";
 
 const REDIS_URL = process.env["REDIS_URL"] ?? "redis://localhost:6379";

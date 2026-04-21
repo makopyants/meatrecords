@@ -36,5 +36,5 @@ export async function getPresignedUploadUrl(key: string, mimeType: string, expir
 export function buildAssetKey(prefix: string, filename: string) {
   const ext = filename.split(".").pop() ?? "";
   const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return `${prefix}/${Date.now()}_${safe}${ext ? "" : ".bin"}`;
+  return `${prefix}/${String(Date.now())}_${safe}${ext ? "" : ".bin"}`;
 }

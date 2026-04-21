@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthResult } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { compare } from "bcryptjs";
@@ -15,8 +15,8 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env["AUTH_SECRET"],
+const result: NextAuthResult = NextAuth({
+  ...(process.env["AUTH_SECRET"] ? { secret: process.env["AUTH_SECRET"] } : {}),
   adapter: PrismaAdapter(prisma),
   providers: [
     Credentials({
@@ -43,14 +43,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   callbacks: {
     jwt({ token, user }) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (user) {
-        token.id = user.id;
+        token["id"] = user.id;
       }
       return token;
     },
     session({ session, token }) {
-      session.user.id = token.id as string;
-      session.user.isModerator = MODERATOR_EMAILS.includes(session.user.email ?? "");
+      session.user.id = token["id"] as string;
+      session.user.isModerator = MODERATOR_EMAILS.includes(session.user.email);
       return session;
     },
   },
@@ -59,6 +60,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login/error",
   },
 });
+
+export const { handlers, auth, signIn, signOut } = result;
 
 declare module "next-auth" {
   interface Session {

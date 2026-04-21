@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -46,9 +46,9 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Дашборд</h1>
-        <Button asChild size="sm">
-          <Link href="/releases/new">+ Новый релиз</Link>
-        </Button>
+        <Link href="/releases/new" className={buttonVariants({ size: "sm" })}>
+          + Новый релиз
+        </Link>
       </div>
 
       {artists.length === 0 && (
@@ -60,9 +60,9 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild>
-              <Link href="/artists/new">Создать артиста</Link>
-            </Button>
+            <Link href="/artists/new" className={buttonVariants()}>
+              Создать артиста
+            </Link>
           </CardContent>
         </Card>
       )}

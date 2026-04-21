@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export default function AuthErrorPage() {
   return (
@@ -11,9 +11,9 @@ export default function AuthErrorPage() {
           <CardDescription>Ссылка недействительна или истекла.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/login">Попробовать снова</Link>
-          </Button>
+          <Link href="/login" className={buttonVariants({ variant: "outline", className: "w-full" })}>
+            Попробовать снова
+          </Link>
         </CardContent>
       </Card>
     </div>

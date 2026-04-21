@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -28,9 +28,9 @@ export default async function ReleasesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Релизы</h1>
-        <Button asChild size="sm">
-          <Link href="/releases/new">+ Новый релиз</Link>
-        </Button>
+        <Link href="/releases/new" className={buttonVariants({ size: "sm" })}>
+          + Новый релиз
+        </Link>
       </div>
 
       {releases.length === 0 ? (

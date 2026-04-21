@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth-helpers";
 import { CreateArtistSchema } from "@repo/shared";
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { email: session!.user.email } });
+  const user = await prisma.user.findUnique({ where: { email: session.user.email } });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const existing = await prisma.artist.findUnique({ where: { slug: parsed.data.slug } });

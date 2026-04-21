@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireModerator } from "@/lib/auth-helpers";
 import { ModerateReleaseSchema, canTransition } from "@repo/shared";
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
     event,
     actorRole: "moderator",
-    reason: parsed.data.reason,
+    ...(parsed.data.reason !== undefined ? { reason: parsed.data.reason } : {}),
   });
 
   if (!result.allowed) {
@@ -48,15 +49,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   await prisma.$transaction([
-    prisma.release.update({ where: { id }, data: { status: result.toStatus } }),
+    prisma.release.update({ where: { id }, data: { status: result.toStatus! } }),
     prisma.moderationRecord.create({
       data: {
         releaseId: id,
         action: parsed.data.action === "approve" ? "APPROVED"
           : parsed.data.action === "reject" ? "REJECTED"
           : "SENT_BACK",
-        reason: parsed.data.reason,
-        moderatorEmail: session!.user.email,
+        ...(parsed.data.reason !== undefined ? { reason: parsed.data.reason } : {}),
+        moderatorEmail: session.user.email,
       },
     }),
     prisma.releaseStatusEvent.create({
@@ -66,8 +67,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         toStatus: result.toStatus!,
         event,
         actorRole: "moderator",
-        actorRef: session!.user.email,
-        reason: parsed.data.reason,
+        actorRef: session.user.email,
+        reason: parsed.data.reason ?? null,
       },
     }),
   ]);

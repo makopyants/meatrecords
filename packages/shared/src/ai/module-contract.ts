@@ -4,7 +4,7 @@ import type { BrandProfileV1 } from "../brand-profile/v1.schema.js";
 export type AiModule = "BRAND" | "COVER" | "SOCIAL" | "TEASER";
 
 export interface StorageClient {
-  upload(key: string, data: Buffer, mimeType: string): Promise<string>;
+  upload(key: string, data: Uint8Array, mimeType: string): Promise<string>;
   getSignedUrl(key: string, expiresInSec: number): Promise<string>;
 }
 
@@ -63,7 +63,7 @@ export interface ModuleContext {
   reportProgress(stage: string, percent: number): Promise<void>;
   logCost(entry: CostLogEntry): void;
   storage: StorageClient;
-  abortSignal: AbortSignal;
+  abortSignal: { aborted: boolean; addEventListener(type: string, listener: () => void): void };
 }
 
 export interface ModuleResult<TOutput> {

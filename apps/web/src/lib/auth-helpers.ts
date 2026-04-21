@@ -10,10 +10,10 @@ export async function requireSession() {
 }
 
 export async function requireModerator() {
-  const { session, error } = await requireSession();
-  if (error ?? !session) return { session: null, error: error ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (!session.user.isModerator) {
+  const result = await requireSession();
+  if (result.error) return { session: null, error: result.error };
+  if (!result.session.user.isModerator) {
     return { session: null, error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
-  return { session, error: null };
+  return { session: result.session, error: null };
 }

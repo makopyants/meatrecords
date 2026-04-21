@@ -24,7 +24,7 @@ export default auth((req) => {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL("/login", nextUrl));
     }
-    const isModerator = MODERATOR_EMAILS.includes(session.user.email ?? "");
+    const isModerator = MODERATOR_EMAILS.includes(session.user.email);
     if (!isModerator) {
       return NextResponse.redirect(new URL("/", nextUrl));
     }

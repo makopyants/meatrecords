@@ -10,13 +10,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1034.0",
+    "@prisma/client": "^5.16.0",
+    "@repo/ai-prompts": "workspace:*",
     "@repo/shared": "workspace:*",
     "bullmq": "^5.0.0",
     "ioredis": "^5.4.0",
-    "@prisma/client": "^5.16.0"
+    "openai": "^6.34.0"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0"
   }
 }

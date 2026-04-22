@@ -1,27 +1,21 @@
 import { Worker } from "bullmq";
 import { connection, AI_JOBS_QUEUE, type AiJobPayload } from "./queues.js";
 import { prisma } from "./lib/prisma.js";
+import { runCoverModule } from "./modules/cover.js";
 
 const BACKOFF_DELAYS = [5_000, 30_000, 120_000];
 
-async function processModule(module: AiJobPayload["module"], input: unknown, releaseId: string) {
-  // Mock implementations — replace with real AI calls per module
+async function processModule(
+  module: AiJobPayload["module"],
+  input: unknown,
+  _releaseId: string,
+  onProgress: (pct: number) => void,
+) {
   switch (module) {
-    case "COVER":
-      return {
-        generatedContent: {
-          module: "COVER" as const,
-          payload: {
-            covers: [
-              {
-                url: "https://placehold.co/3000x3000/0A0A0A/E8E8E8?text=COVER",
-                prompt: "Mock cover generated from brand profile",
-                variation: "v1",
-              },
-            ],
-          },
-        },
-      };
+    case "COVER": {
+      const covers = await runCoverModule(input, onProgress);
+      return { generatedContent: { module: "COVER" as const, payload: covers } };
+    }
 
     case "SOCIAL":
       return {
@@ -88,7 +82,9 @@ const worker = new Worker<AiJobPayload>(
 
     await job.updateProgress({ stage: "processing", percent: 30 });
 
-    const result = await processModule(module, input, releaseId ?? "");
+    const result = await processModule(module, input, releaseId ?? "", (pct) => {
+      void job.updateProgress({ stage: "processing", percent: pct });
+    });
 
     await job.updateProgress({ stage: "saving", percent: 80 });
 
@@ -100,7 +96,8 @@ const worker = new Worker<AiJobPayload>(
             releaseId,
             module: result.generatedContent.module,
             status: "READY",
-            payload: result.generatedContent.payload,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            payload: result.generatedContent.payload as any,
           },
         });
       }
@@ -110,7 +107,8 @@ const worker = new Worker<AiJobPayload>(
         data: {
           status: "SUCCEEDED",
           finishedAt: new Date(),
-          output: result.generatedContent.payload,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          output: result.generatedContent.payload as any,
         },
       });
     });

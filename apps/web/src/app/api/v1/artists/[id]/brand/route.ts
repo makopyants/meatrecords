@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth-helpers";
 import { BrandProfileV1Schema } from "@repo/shared";
+import { getAiJobsQueue } from "@/lib/queue";
 import { z } from "zod";
 
 const CreateBrandSchema = z.object({
@@ -54,6 +55,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       where: { id: artistId },
       data: { currentBrandId: brand.id },
     });
+
+    // Queue logo generation
+    try {
+      const jobId = `brand-logo-${brand.id}`;
+      const aiJob = await prisma.aiJob.create({
+        data: {
+          module: "BRAND",
+          jobId,
+          status: "QUEUED",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        input: { brandProfileId: brand.id, artistId, brandProfileData: brand.data } as any,
+        },
+      });
+      const queue = getAiJobsQueue();
+      await queue.add(
+        "BRAND",
+        { jobId: aiJob.id, module: "BRAND", artistId, input: aiJob.input },
+        { jobId: aiJob.id, attempts: 3, backoff: { type: "custom" } },
+      );
+      console.log(`[brand] queued logo job=${aiJob.id} for brandProfile=${brand.id}`);
+    } catch (e) {
+      console.error("[brand] failed to queue logo job:", e);
+    }
   }
 
   return NextResponse.json(brand, { status: 201 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,9 +103,17 @@ interface Props {
   jobStatus: string | null;
 }
 
-export function ModuleSection({ module, content, jobStatus }: Props) {
+const UPLOAD_ACCEPT: Record<string, string> = {
+  COVER: "image/jpeg,image/png,image/webp",
+  TEASER: "video/mp4,video/quicktime",
+};
+
+export function ModuleSection({ releaseId, module, content, jobStatus }: Props) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const label = MODULE_LABEL[module] ?? module;
   const isReady = content?.status === "READY";
@@ -122,6 +130,59 @@ export function ModuleSection({ module, content, jobStatus }: Props) {
     });
     router.refresh();
     setPending(false);
+  }
+
+  async function regenerate() {
+    setPending(true);
+    await fetch(`/api/v1/releases/${releaseId}/regenerate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ module }),
+    });
+    router.refresh();
+    setPending(false);
+  }
+
+  async function uploadOwn(file: File) {
+    setUploading(true);
+    setUploadError("");
+    try {
+      const urlRes = await fetch(`/api/v1/releases/${releaseId}/upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: file.name,
+          mimeType: file.type,
+          kind: module === "TEASER" ? "OTHER" : module,
+          sizeBytes: file.size,
+        }),
+      });
+      const urlData = await urlRes.json() as { devMode?: boolean; asset?: { url: string }; uploadUrl?: string; key?: string };
+
+      let finalUrl: string;
+
+      if (urlData.devMode && urlData.asset) {
+        finalUrl = urlData.asset.url;
+      } else if (urlData.uploadUrl && urlData.key) {
+        await fetch(urlData.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+        const pubUrl = urlData.key;
+        finalUrl = pubUrl;
+      } else {
+        throw new Error("Не удалось получить URL для загрузки");
+      }
+
+      await fetch(`/api/v1/releases/${releaseId}/manual-content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ module, url: finalUrl, fileName: file.name, mimeType: file.type, sizeBytes: file.size }),
+      });
+
+      router.refresh();
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setUploading(false);
+    }
   }
 
   function renderPayload() {
@@ -175,44 +236,62 @@ export function ModuleSection({ module, content, jobStatus }: Props) {
         )}
 
         {jobStatus === "FAILED" && (
-          <p className="text-sm text-destructive">Ошибка при генерации.</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-destructive">Ошибка при генерации.</p>
+            <Button size="sm" variant="outline" disabled={pending} onClick={() => void regenerate()}>
+              Повторить
+            </Button>
+          </div>
         )}
 
         {content && renderPayload()}
 
         {(isReady || isRejected || isApproved) && (
-          <div className="flex gap-2 pt-1">
+          <div className="flex flex-wrap gap-2 pt-1">
             {!isApproved && (
-              <Button
-                size="sm"
-                disabled={pending}
-                onClick={() => void setStatus("APPROVED")}
-              >
+              <Button size="sm" disabled={pending} onClick={() => void setStatus("APPROVED")}>
                 Одобрить
               </Button>
             )}
             {!isRejected && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={pending}
-                onClick={() => void setStatus("REJECTED")}
-              >
+              <Button size="sm" variant="outline" disabled={pending} onClick={() => void setStatus("REJECTED")}>
                 Отклонить
               </Button>
             )}
             {isRejected && (
+              <Button size="sm" variant="ghost" disabled={pending} onClick={() => void setStatus("READY")}>
+                ← Вернуть
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => void regenerate()}>
+              Сгенерировать заново
+            </Button>
+            {(module === "COVER" || module === "TEASER") && (
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={pending}
-                onClick={() => void setStatus("READY")}
+                disabled={pending || uploading}
+                onClick={() => fileInputRef.current?.click()}
               >
-                ← Вернуть
+                {uploading ? "Загружается..." : "Использовать свой"}
               </Button>
             )}
           </div>
         )}
+
+        {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept={UPLOAD_ACCEPT[module]}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void uploadOwn(file);
+            e.target.value = "";
+          }}
+        />
       </CardContent>
     </Card>
   );

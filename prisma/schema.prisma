@@ -124,6 +124,7 @@ model Artist {
   user           User          @relation(fields: [userId], references: [id])
   name           String
   slug           String        @unique
+  photoUrl       String?
   currentBrandId String?       @unique
   currentBrand   BrandProfile? @relation("CurrentBrand", fields: [currentBrandId], references: [id])
   brands         BrandProfile[] @relation("AllBrands")

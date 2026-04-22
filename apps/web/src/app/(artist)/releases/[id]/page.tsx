@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ReleaseActions } from "./release-actions";
 import { ModuleSection } from "./module-section";
-import { AudioUpload } from "./audio-upload";
+import { TrackSection } from "./track-section";
 import { PendingPoller } from "./pending-poller";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -40,7 +40,7 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
       artist: { select: { name: true } },
       assets: true,
       generatedContents: { orderBy: { createdAt: "desc" } },
-      aiJobs: { orderBy: { createdAt: "asc" } },
+      aiJobs: { orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -53,8 +53,25 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
     (mod) => pipeline.modules?.[mod.toLowerCase() as "cover" | "social" | "teaser"] !== false,
   );
 
-  const hasAudio = release.assets.some((a) => a.kind === "AUDIO_MASTER");
-  const isPending = release.status === "CONTENT_PENDING";
+  const audioAsset = release.assets.find((a) => a.kind === "AUDIO_MASTER") ?? null;
+  const coverAsset = release.assets.find((a) => a.kind === "COVER") ?? null;
+  const hasAudio = !!audioAsset;
+  const hasActiveJobs = release.aiJobs.some((j) => j.status === "QUEUED" || j.status === "RUNNING");
+  const isPending = release.status === "CONTENT_PENDING" || hasActiveJobs;
+
+  const latestContentByModule = new Map(
+    (["COVER", "SOCIAL", "TEASER"] as const).map((mod) => [
+      mod,
+      release.generatedContents.find((c) => c.module === mod) ?? null,
+    ]),
+  );
+  const hasUnreviewed = enabledModules.some(
+    (mod) => latestContentByModule.get(mod)?.status === "READY",
+  );
+  const canSubmit = !hasActiveJobs && !hasUnreviewed;
+
+  const metadata = (release.metadata ?? {}) as Record<string, unknown>;
+  const lyrics = typeof metadata["lyrics"] === "string" ? metadata["lyrics"] : "";
 
   return (
     <div className="flex flex-col gap-8 max-w-2xl">
@@ -70,10 +87,29 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
         </Badge>
       </div>
 
-      <ReleaseActions releaseId={release.id} status={release.status} hasAudio={hasAudio} />
+      {release.status === "DRAFT" && (
+        <>
+          <Separator />
+          <TrackSection
+            releaseId={release.id}
+            audioAsset={audioAsset ? { id: audioAsset.id, fileName: audioAsset.fileName, sizeBytes: audioAsset.sizeBytes } : null}
+            coverAsset={coverAsset ? { id: coverAsset.id, url: coverAsset.url } : null}
+            initialLyrics={lyrics}
+          />
+        </>
+      )}
 
       {release.status !== "DRAFT" && (
         <>
+          <ReleaseActions
+            releaseId={release.id}
+            status={release.status}
+            hasAudio={hasAudio}
+            canSubmit={canSubmit}
+            hasActiveJobs={hasActiveJobs}
+            hasUnreviewed={hasUnreviewed}
+          />
+
           <Separator />
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
@@ -99,18 +135,6 @@ export default async function ReleasePage({ params }: { params: Promise<{ id: st
                 />
               );
             })}
-          </div>
-        </>
-      )}
-
-      {release.status === "DRAFT" && (
-        <>
-          <Separator />
-          <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Аудиофайл
-            </h2>
-            <AudioUpload releaseId={release.id} hasAudio={hasAudio} />
           </div>
         </>
       )}

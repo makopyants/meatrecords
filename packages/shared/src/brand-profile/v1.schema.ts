@@ -24,6 +24,14 @@ const IdentityBlockSchema = z.object({
       backgroundVariants: z.array(z.enum(["light", "dark", "transparent"])),
     })
     .nullable(),
+  logomarkVariants: z
+    .array(
+      z.object({
+        prompt: z.string(),
+        imageUrl: z.string().url(),
+      }),
+    )
+    .optional(),
 });
 
 const VisualBlockSchema = z.object({

@@ -89,7 +89,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             releaseId: id,
             artistId: release.artistId,
             brandProfileData: release.brandProfile.data,
-            release: { title: release.title },
+            release: {
+              title: release.title,
+              ...(() => {
+                const lyrics = (release.metadata as Record<string, unknown>)["lyrics"];
+                return typeof lyrics === "string" && lyrics.trim()
+                  ? { lyricsExcerpt: lyrics.slice(0, 500) }
+                  : {};
+              })(),
+            },
           },
         },
       });

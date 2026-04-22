@@ -105,7 +105,7 @@ export type CoverOutput = {
 export type SocialInput = {
   brandProfile: BrandProfileV1;
   release: { title: string; releaseDate: Date; coverUrl: string };
-  platforms: Array<"telegram" | "vk" | "instagram">;
+  platforms: Array<"telegram" | "vk" | "instagram" | "youtube" | "tiktok">;
 };
 export type SocialOutput = {
   posts: Array<{

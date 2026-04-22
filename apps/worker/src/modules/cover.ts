@@ -81,9 +81,9 @@ export async function runCoverModule(
     console.log(`[cover] using Pollinations.ai (free, no key required)`);
     const covers: CoverResult["covers"] = [];
 
+    const baseSeed = Math.floor(Math.random() * 90000) + 10000;
     for (let i = 0; i < VARIANTS; i++) {
-      // Different seed per variant for visual diversity
-      const seed = 1000 + i * 337;
+      const seed = baseSeed + i * 337;
       const encodedPrompt = encodeURIComponent(prompt);
       const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${String(seed)}&model=flux&nologo=true&enhance=true`;
 
@@ -91,6 +91,8 @@ export async function runCoverModule(
       console.log(`[cover] generating variant ${i + 1}/${VARIANTS} via Pollinations…`);
       const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
       if (!res.ok) throw new Error(`Pollinations returned ${String(res.status)}`);
+
+      if (i > 0) await new Promise((r) => setTimeout(r, 3000));
 
       let finalUrl = url;
 

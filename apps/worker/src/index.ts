@@ -2,6 +2,9 @@ import { Worker } from "bullmq";
 import { connection, AI_JOBS_QUEUE, type AiJobPayload } from "./queues.js";
 import { prisma } from "./lib/prisma.js";
 import { runCoverModule } from "./modules/cover.js";
+import { runSocialModule } from "./modules/social.js";
+import { runBrandModule } from "./modules/brand.js";
+import type { BrandJobInput } from "./modules/brand.js";
 
 const BACKOFF_DELAYS = [5_000, 30_000, 120_000];
 
@@ -17,26 +20,10 @@ async function processModule(
       return { generatedContent: { module: "COVER" as const, payload: covers } };
     }
 
-    case "SOCIAL":
-      return {
-        generatedContent: {
-          module: "SOCIAL" as const,
-          payload: {
-            posts: [
-              {
-                platform: "vk",
-                text: "New release is coming. Stay tuned.",
-                hashtags: ["music", "newrelease"],
-              },
-              {
-                platform: "telegram",
-                text: "New release is coming. Stay tuned.",
-                hashtags: ["music", "newrelease"],
-              },
-            ],
-          },
-        },
-      };
+    case "SOCIAL": {
+      const posts = await runSocialModule(input);
+      return { generatedContent: { module: "SOCIAL" as const, payload: posts } };
+    }
 
     case "TEASER":
       return {
@@ -50,13 +37,10 @@ async function processModule(
         },
       };
 
-    case "BRAND":
-      return {
-        generatedContent: {
-          module: "BRAND" as const,
-          payload: { message: "Brand module processed" },
-        },
-      };
+    case "BRAND": {
+      const result = await runBrandModule(input, onProgress);
+      return { generatedContent: { module: "BRAND" as const, payload: result } };
+    }
 
     default: {
       const _exhaustive: never = module;
@@ -113,6 +97,22 @@ const worker = new Worker<AiJobPayload>(
       });
     });
 
+    // For BRAND jobs: store logomarkVariants (user selects one later → sets logomark)
+    if (module === "BRAND") {
+      const brandInput = job.data.input as BrandJobInput;
+      if (brandInput.brandProfileId) {
+        const bp = await prisma.brandProfile.findUnique({ where: { id: brandInput.brandProfileId } });
+        if (bp) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const data = bp.data as any;
+          const logomarkVariants = (result.generatedContent.payload as { logomarkVariants: unknown }).logomarkVariants;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await prisma.brandProfile.update({ where: { id: bp.id }, data: { data: { ...data, identity: { ...data.identity, logomarkVariants } } as any } });
+          console.log(`[worker] stored ${String(Array.isArray(logomarkVariants) ? logomarkVariants.length : 0)} logomark variants for brandProfile=${bp.id}`);
+        }
+      }
+    }
+
     // Check if all jobs for this release are done → transition to CONTENT_REVIEW
     if (releaseId) {
       const allJobs = await prisma.aiJob.findMany({ where: { releaseId } });
@@ -147,7 +147,8 @@ const worker = new Worker<AiJobPayload>(
   },
   {
     connection,
-    concurrency: 2,
+    concurrency: 1,
+    lockDuration: 600_000, // 10 min — BRAND jobs generate 3 images via Pollinations, each can take ~60-120s
     settings: {
       backoffStrategy: (attemptsMade) =>
         BACKOFF_DELAYS[attemptsMade - 1] ?? 120_000,

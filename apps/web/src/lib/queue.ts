@@ -5,7 +5,7 @@ import type { AiModule } from "@repo/shared";
 export interface AiJobPayload {
   jobId: string;
   module: AiModule;
-  releaseId: string;
+  releaseId?: string | null;
   artistId: string;
   input: unknown;
 }

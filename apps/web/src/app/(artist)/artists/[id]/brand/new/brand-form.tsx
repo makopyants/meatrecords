@@ -7,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { BrandProfileV1 } from "@repo/shared";
 
 interface Props {
   artistId: string;
   defaultName?: string;
+  existing?: BrandProfileV1 | null;
 }
 
 const MOODS = [
@@ -72,19 +74,25 @@ const PLATFORMS = [
   { id: "spotify", label: "Spotify" },
 ] as const;
 
-export function BrandForm({ artistId, defaultName = "" }: Props) {
+export function BrandForm({ artistId, defaultName = "", existing }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
-  const [artistName, setArtistName] = useState(defaultName);
-  const [oneLiner, setOneLiner] = useState("");
-  const [description, setDescription] = useState("");
-  const [genreInput, setGenreInput] = useState("");
-  const [selectedMood, setSelectedMood] = useState<MoodId | null>(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["vk"]);
-  const [language, setLanguage] = useState<"ru" | "en" | "ru_en_mixed">("ru");
+  const [artistName, setArtistName] = useState(existing?.identity.artistName ?? defaultName);
+  const [oneLiner, setOneLiner] = useState(existing?.identity.concept.oneLiner ?? "");
+  const [description, setDescription] = useState(existing?.identity.concept.description ?? "");
+  const [genreInput, setGenreInput] = useState(existing?.audience.positioning.genre.join(", ") ?? "");
+  const [selectedMood, setSelectedMood] = useState<MoodId | null>(
+    (existing?.visual.palette.mood as MoodId | undefined) ?? null,
+  );
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(
+    existing?.audience.platforms.map((p) => p.name) ?? ["vk"],
+  );
+  const [language, setLanguage] = useState<"ru" | "en" | "ru_en_mixed">(
+    existing?.verbal.language.primary ?? "ru",
+  );
 
   const steps = [
     {
@@ -188,7 +196,7 @@ export function BrandForm({ artistId, defaultName = "" }: Props) {
     });
 
     if (res.ok) {
-      router.push("/releases/new");
+      router.push(`/artists/${artistId}`);
       router.refresh();
     } else {
       const data = await res.json() as { error: unknown };

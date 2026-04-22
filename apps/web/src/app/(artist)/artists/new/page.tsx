@@ -40,7 +40,8 @@ export default function NewArtistPage() {
     });
 
     if (res.ok) {
-      router.push("/dashboard");
+      const data = await res.json() as { id: string };
+      router.push(`/artists/${data.id}/brand/new`);
       router.refresh();
     } else {
       const data = await res.json() as { error: string };

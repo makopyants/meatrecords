@@ -9,6 +9,9 @@ interface Props {
   releaseId: string;
   status: string;
   hasAudio: boolean;
+  canSubmit: boolean;
+  hasActiveJobs: boolean;
+  hasUnreviewed: boolean;
 }
 
 async function transition(releaseId: string, event: ReleaseEvent, reason?: string) {
@@ -20,7 +23,7 @@ async function transition(releaseId: string, event: ReleaseEvent, reason?: strin
   return res;
 }
 
-export function ReleaseActions({ releaseId, status, hasAudio }: Props) {
+export function ReleaseActions({ releaseId, status, hasAudio, canSubmit, hasActiveJobs, hasUnreviewed }: Props) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -73,13 +76,31 @@ export function ReleaseActions({ releaseId, status, hasAudio }: Props) {
       )}
 
       {status === "CONTENT_REVIEW" && (
-        <div className="flex gap-2 flex-wrap">
-          <Button size="sm" disabled={pending} onClick={() => void act("submit_to_moderation")}>
-            Отправить на модерацию
-          </Button>
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => void act("back_to_edit")}>
-            Вернуть в черновик
-          </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              disabled={pending || !canSubmit}
+              onClick={() => void act("submit_to_moderation")}
+              title={
+                hasActiveJobs ? "Дождись завершения генерации" :
+                hasUnreviewed ? "Одобри или отклони все модули" :
+                undefined
+              }
+            >
+              Отправить на модерацию
+            </Button>
+            <Button size="sm" variant="outline" disabled={pending} onClick={() => void act("back_to_edit")}>
+              Вернуть в черновик
+            </Button>
+          </div>
+          {!canSubmit && (
+            <p className="text-xs text-muted-foreground">
+              {hasActiveJobs
+                ? "⏳ Генерация ещё идёт — дождись завершения."
+                : "⚠ Есть неодобренные модули — одобри или отклони каждый."}
+            </p>
+          )}
         </div>
       )}
 

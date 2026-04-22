@@ -2,8 +2,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import type { BrandProfileV1 } from "@repo/shared";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Черновик",
@@ -27,6 +28,14 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   LIVE: "default",
 };
 
+const MOOD_LABEL: Record<string, string> = {
+  dark: "Тёмный",
+  vibrant: "Яркий",
+  muted: "Атмосферный",
+  monochrome: "Минимализм",
+  light: "Светлый",
+};
+
 export default async function DashboardPage() {
   const session = await auth();
 
@@ -36,68 +45,127 @@ export default async function DashboardPage() {
       releases: {
         where: { deletedAt: null },
         orderBy: { updatedAt: "desc" },
-        take: 5,
+        take: 3,
       },
-      currentBrand: { select: { id: true } },
+      currentBrand: { select: { id: true, status: true, version: true, data: true } },
     },
+    orderBy: { createdAt: "desc" },
   });
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Дашборд</h1>
-        <Link href="/releases/new" className={buttonVariants({ size: "sm" })}>
-          + Новый релиз
+        <Link href="/artists/new" className={buttonVariants({ size: "sm", variant: "outline" })}>
+          + Артист
         </Link>
       </div>
 
       {artists.length === 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>Добро пожаловать!</CardTitle>
-            <CardDescription>
-              Создай артиста чтобы начать загружать релизы.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/artists/new" className={buttonVariants()}>
+          <CardContent className="pt-6 flex flex-col gap-3">
+            <p className="font-medium">Добро пожаловать!</p>
+            <p className="text-sm text-muted-foreground">Создай артиста чтобы начать загружать релизы.</p>
+            <Link href="/artists/new" className={buttonVariants({ className: "self-start" })}>
               Создать артиста
             </Link>
           </CardContent>
         </Card>
       )}
 
-      {artists.map((artist) => (
-        <section key={artist.id}>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">{artist.name}</h2>
-            {!artist.currentBrand && (
-              <Link href={`/artists/${artist.id}/brand/new`}
-                className="text-xs text-amber-600 hover:underline">
-                ⚠ Нет BrandProfile — создай перед релизом
+      <div className="flex flex-col gap-6">
+        {artists.map((artist) => {
+          const brand = artist.currentBrand?.data
+            ? (artist.currentBrand.data as unknown as BrandProfileV1)
+            : null;
+          const genres = brand?.audience.positioning.genre ?? [];
+          const mood = brand?.visual.palette.mood;
+          const palette = brand ? [brand.visual.palette.primary, brand.visual.palette.secondary, brand.visual.palette.accent] : [];
+          const initials = artist.name.slice(0, 2).toUpperCase();
+
+          return (
+            <div key={artist.id} className="flex flex-col gap-3">
+              {/* Artist card */}
+              <Link
+                href={`/artists/${artist.id}`}
+                className="flex items-center gap-4 rounded-xl border p-4 hover:bg-muted/50 transition-colors"
+              >
+                {/* Avatar */}
+                <div className="w-12 h-12 rounded-full bg-muted border flex items-center justify-center overflow-hidden shrink-0">
+                  {artist.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={artist.photoUrl} alt={artist.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-bold text-muted-foreground">{initials}</span>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold truncate">{artist.name}</span>
+                    {palette.length > 0 && (
+                      <div className="flex gap-1 ml-1">
+                        {palette.map((c) => (
+                          <div key={c} className="w-3 h-3 rounded-full border border-border" style={{ background: c }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {genres.slice(0, 3).map((g) => (
+                      <span key={g} className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">{g}</span>
+                    ))}
+                    {mood && (
+                      <span className="text-xs text-muted-foreground">{MOOD_LABEL[mood] ?? mood}</span>
+                    )}
+                    {!artist.currentBrand && (
+                      <span className="text-xs text-amber-600">⚠ Нет бренд-профиля</span>
+                    )}
+                  </div>
+                </div>
+
+                <span className="text-xs text-muted-foreground shrink-0">→</span>
               </Link>
-            )}
-          </div>
-          {artist.releases.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Нет релизов.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {artist.releases.map((release) => (
-                <Link
-                  key={release.id}
-                  href={`/releases/${release.id}`}
-                  className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-muted/50 transition-colors"
-                >
-                  <span className="font-medium">{release.title}</span>
-                  <Badge variant={STATUS_VARIANT[release.status] ?? "outline"}>
-                    {STATUS_LABEL[release.status] ?? release.status}
-                  </Badge>
-                </Link>
-              ))}
+
+              {/* Releases */}
+              {artist.releases.length > 0 && (
+                <div className="flex flex-col gap-1.5 pl-4 border-l-2 border-border ml-6">
+                  {artist.releases.map((release) => (
+                    <Link
+                      key={release.id}
+                      href={`/releases/${release.id}`}
+                      className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-muted/50 transition-colors"
+                    >
+                      <span className="text-sm truncate">{release.title}</span>
+                      <Badge variant={STATUS_VARIANT[release.status] ?? "outline"} className="ml-2 shrink-0 text-xs">
+                        {STATUS_LABEL[release.status] ?? release.status}
+                      </Badge>
+                    </Link>
+                  ))}
+                  <Link
+                    href="/releases/new"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1"
+                  >
+                    + Новый релиз
+                  </Link>
+                </div>
+              )}
+
+              {artist.releases.length === 0 && (
+                <div className="pl-10">
+                  <Link
+                    href="/releases/new"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    + Создать первый релиз
+                  </Link>
+                </div>
+              )}
             </div>
-          )}
-        </section>
-      ))}
+          );
+        })}
+      </div>
     </div>
   );
 }
